@@ -2,15 +2,37 @@
 
 Route::model('book', 'Book');
 
+Route::get('/', function() {
+  return Redirect::to("books");
+});
+
+Route::get('books', function(){
+  $books = Book::all();
+  return View::make('books/index')
+    ->with('books', $books);
+});
+
+Route::group(array('before'=>'auth'), function(){
+
 Route::get('books/{book}/edit', function(Book $book) {
-	return View::make('books.edit')
-	->with('book', $book)
-	->with('method', 'put');
+    if(Auth::user()->canEdit($book)){
+      return View::make('books.edit')
+        ->with('book', $book)
+        ->with('method', 'put');
+    } else {
+      return Redirect::to('books/' . $book->id)
+        ->with('error', "You are not allowed to edit this page");
+    }
 });
 Route::get('books/{book}/delete', function(Book $book) {
-	return View::make('books.edit')
-	->with('book', $book)
-	->with('method', 'delete');
+    if(Auth::user()->canEdit($book)){
+      return View::make('books.edit')
+        ->with('book', $book)
+        ->with('method', 'delete');
+    } else {
+      return Redirect::to('books/' . $book->id)
+        ->with('error', "You are not allowed to delete this page");
+    }
 });
 
 Route::put('books/{book}', function(Book $book) {
@@ -25,15 +47,6 @@ Route::delete('books/{book}', function(Book $book) {
     ->with('message', 'Successfully deleted book!');
 });
 
-Route::get('/', function() {
-  return Redirect::to("books");
-});
-
-Route::get('books', function(){
-  $books = Book::all();
-  return View::make('books/index')
-    ->with('books', $books);
-});
 
 Route::get('books/create', function() {
 	$book = new Book;
@@ -44,8 +57,14 @@ Route::get('books/create', function() {
 
 Route::post('books', function() {
 	$book = Book::create(Input::all());
-	return Redirect::to('books/' . $book->id)
-	->with('message', 'Successfully created book');
+	$book->user_id = Auth::user()->id;
+    if ($book->save()) {
+		return Redirect::to('books/' . $book->id)
+		->with('message', 'Successfully created book');
+	} else {
+		return Redirect::back()
+		->with('error', 'Could not create book');		
+	}
 });
 
 Route::get('books/{id}', function($id) {
@@ -54,7 +73,23 @@ Route::get('books/{id}', function($id) {
 	->with('book', $book);
 });
 
+});
 
+Route::get('login', array('before'=>'guest', function(){
+  return View::make('login');
+}));
 
+Route::post('login', function(){
+  if(Auth::attempt(Input::only('username', 'password')))
+    return Redirect::intended('/');
+  else
+    return Redirect::back()
+      ->withInput()
+      ->with('error', "Invalid credentials");
+});
 
+Route::get('logout', function(){
+  Auth::logout();
+  return Redirect::to('/');
+});
 
